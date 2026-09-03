@@ -1,0 +1,10 @@
+{
+  "name": "PRH-LEAD-PROCESS-MESSAGE",
+  "nodes": [],
+  "connections": {},
+  "settings": {},
+  "staticData": null,
+  "meta": {
+    "description": "Placeholder. Implement per n8n Workflow Specification.md"
+  }
+}

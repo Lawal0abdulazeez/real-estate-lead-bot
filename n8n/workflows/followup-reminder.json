@@ -1,0 +1,10 @@
+{
+  "name": "PRH-FOLLOWUP-REMINDER",
+  "nodes": [],
+  "connections": {},
+  "settings": {},
+  "staticData": null,
+  "meta": {
+    "description": "Placeholder. Scheduled follow-up reminders."
+  }
+}

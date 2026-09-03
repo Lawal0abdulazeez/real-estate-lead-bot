@@ -1,0 +1,10 @@
+{
+  "name": "PRH-LEAD-NOTIFY-SALES",
+  "nodes": [],
+  "connections": {},
+  "settings": {},
+  "staticData": null,
+  "meta": {
+    "description": "Placeholder. Notify sales on HOT leads."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "PRH-ERROR-HANDLER",
+  "nodes": [],
+  "connections": {},
+  "settings": {},
+  "staticData": null,
+  "meta": {
+    "description": "Placeholder. Central error handling for workflows."
+  }
+}

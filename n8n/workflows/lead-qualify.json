@@ -1,0 +1,10 @@
+{
+  "name": "PRH-LEAD-QUALIFY",
+  "nodes": [],
+  "connections": {},
+  "settings": {},
+  "staticData": null,
+  "meta": {
+    "description": "Placeholder. Deterministic lead scoring & classification."
+  }
+}
