@@ -1,0 +1,94 @@
+"""Shared enumerations matching the Database & Lead Qualification specs."""
+
+import enum
+
+
+class PropertyType(str, enum.Enum):
+    APARTMENT = "APARTMENT"
+    HOUSE = "HOUSE"
+    DUPLEX = "DUPLEX"
+    TERRACE = "TERRACE"
+    DETACHED_HOUSE = "DETACHED_HOUSE"
+    LAND = "LAND"
+    COMMERCIAL = "COMMERCIAL"
+    OFFICE = "OFFICE"
+    OTHER = "OTHER"
+    UNKNOWN = "UNKNOWN"
+
+
+class TransactionType(str, enum.Enum):
+    BUY = "BUY"
+    RENT = "RENT"
+    SELL = "SELL"
+    INQUIRE = "INQUIRE"
+    UNKNOWN = "UNKNOWN"
+
+
+class Timeline(str, enum.Enum):
+    IMMEDIATE = "IMMEDIATE"
+    WITHIN_1_MONTH = "WITHIN_1_MONTH"
+    WITHIN_3_MONTHS = "WITHIN_3_MONTHS"
+    WITHIN_6_MONTHS = "WITHIN_6_MONTHS"
+    RESEARCHING = "RESEARCHING"
+    UNKNOWN = "UNKNOWN"
+
+
+class LeadStatus(str, enum.Enum):
+    NEW = "NEW"
+    QUALIFYING = "QUALIFYING"
+    QUALIFIED = "QUALIFIED"
+    ASSIGNED = "ASSIGNED"
+    CONTACTED = "CONTACTED"
+    ENGAGED = "ENGAGED"
+    VIEWING_SCHEDULED = "VIEWING_SCHEDULED"
+    NEGOTIATING = "NEGOTIATING"
+    NURTURE = "NURTURE"
+    CONVERTED = "CONVERTED"
+    LOST = "LOST"
+
+
+class Classification(str, enum.Enum):
+    HOT = "HOT"
+    WARM = "WARM"
+    COLD = "COLD"
+    UNQUALIFIED = "UNQUALIFIED"
+
+
+class Intent(str, enum.Enum):
+    BUY = "BUY"
+    RENT = "RENT"
+    SELL = "SELL"
+    LAND = "LAND"
+    PROPERTY_ENQUIRY = "PROPERTY_ENQUIRY"
+    GENERAL_ENQUIRY = "GENERAL_ENQUIRY"
+    HUMAN_AGENT = "HUMAN_AGENT"
+    OTHER = "OTHER"
+    UNKNOWN = "UNKNOWN"
+
+
+class SenderType(str, enum.Enum):
+    CUSTOMER = "CUSTOMER"
+    BOT = "BOT"
+    AGENT = "AGENT"
+    SYSTEM = "SYSTEM"
+
+
+class ConversationStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    CLOSED = "CLOSED"
+
+
+class ActivityType(str, enum.Enum):
+    LEAD_CREATED = "LEAD_CREATED"
+    MESSAGE_RECEIVED = "MESSAGE_RECEIVED"
+    AI_PROCESSED = "AI_PROCESSED"
+    LEAD_QUALIFIED = "LEAD_QUALIFIED"
+    SCORE_CHANGED = "SCORE_CHANGED"
+    LEAD_ASSIGNED = "LEAD_ASSIGNED"
+    STATUS_CHANGED = "STATUS_CHANGED"
+    FOLLOW_UP_CREATED = "FOLLOW_UP_CREATED"
+    FOLLOW_UP_COMPLETED = "FOLLOW_UP_COMPLETED"
+    CUSTOMER_CONTACTED = "CUSTOMER_CONTACTED"
+    LEAD_CONVERTED = "LEAD_CONVERTED"
+    LEAD_LOST = "LEAD_LOST"
+    HUMAN_HANDOFF = "HUMAN_HANDOFF"
