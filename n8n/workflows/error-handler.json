@@ -8,3 +8,28 @@
     "description": "Placeholder. Central error handling for workflows."
   }
 }
+
+
+
+http://localhost:5678/webhook-test/primehomes/lead/process-message
+
+
+
+$webhookUrl = "http://localhost:5678/webhook-test/primehomes/lead/process-message"
+
+$body = @{
+    event = "MESSAGE_RECEIVED"
+    message_id = "test-msg-001"
+    conversation_id = "test-conv-001"
+    lead_id = "test-lead-001"
+    timestamp = (Get-Date).ToUniversalTime().ToString("o")
+    message = "Hello, I am looking for a 3 bedroom apartment in Lagos."
+} | ConvertTo-Json
+
+$response = Invoke-RestMethod `
+    -Uri $webhookUrl `
+    -Method POST `
+    -ContentType "application/json" `
+    -Body $body
+
+$response
