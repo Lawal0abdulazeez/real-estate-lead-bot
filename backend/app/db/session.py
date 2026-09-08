@@ -1,7 +1,4 @@
-"""Database session / engine setup.
-
-Will be expanded when models and Alembic are introduced.
-"""
+"""Database session / engine setup."""
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
