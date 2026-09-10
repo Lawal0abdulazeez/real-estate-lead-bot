@@ -1,0 +1,26 @@
+{
+  "name": "PRH-LEAD-PROCESS-MESSAGE",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-process-message",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "lead-process-message-webhook",
+      "name": "Receive customer message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "lead-process-message"
+    }
+  ],
+  "connections": {},
+  "active": false,
+  "settings": {},
+  "staticData": null,
+  "meta": {
+    "description": "Receives customer message events from the FastAPI backend. Activate this workflow after importing it."
+  }
+}

@@ -7,7 +7,7 @@ PrimeHomes Realty Real Estate Lead Bot API.
 - REST API (`/api/v1/...`)
 - Request validation & authentication
 - Business rules and lead/conversation/message management
-- Database access (PostgreSQL via SQLAlchemy)
+- Database access (MySQL via SQLAlchemy)
 - Boundary to n8n workflows
 
 ## Structure
@@ -30,12 +30,25 @@ backend/
 
 ## Quick start (local)
 
+Install and start MySQL locally first, then create the `real_estate_leads` database.
+
 ```bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp ../.env.example ../.env  # fill values
+```
+
+On Windows PowerShell, copy the environment template with:
+
+```powershell
+Copy-Item ../.env.example ../.env
+```
+
+After filling in the MySQL credentials in `.env`:
+
+```bash
+alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 

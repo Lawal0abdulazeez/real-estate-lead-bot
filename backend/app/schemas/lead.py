@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field
 
 
 class LeadBase(BaseModel):
@@ -28,7 +28,9 @@ class LeadCreate(LeadBase):
 
 
 class LeadUpdate(BaseModel):
-    name: Optional[str] = None
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(None, validation_alias=AliasChoices("name", "customer_name"))
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     property_type: Optional[str] = None

@@ -1,17 +1,16 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: mysql:8.4
     container_name: prh-leadbot-db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: real_estate_leads
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: real_estate_leads
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d real_estate_leads"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p1234"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,8 +23,8 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/real_estate_leads
-      DATABASE_URL_SYNC: postgresql://postgres:postgres@db:5432/real_estate_leads
+      DATABASE_URL: mysql+aiomysql://root:1234@db:3306/real_estate_leads
+      DATABASE_URL_SYNC: mysql+pymysql://root:1234@db:3306/real_estate_leads
     ports:
       - "8000:8000"
     volumes:
@@ -66,5 +65,5 @@ services:
   #     - backend
 
 volumes:
-  postgres_data:
+  mysql_data:
   n8n_data:

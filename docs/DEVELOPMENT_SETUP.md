@@ -24,7 +24,7 @@ Backend
 → Python + FastAPI
 
 Database
-→ PostgreSQL
+→ MySQL
 
 Automation
 → n8n
@@ -83,8 +83,7 @@ real-estate-lead-bot/
 │
 ├── .env.example
 ├── .gitignore
-├── README.md
-└── docker-compose.yml
+└── README.md
 ```
 
 The structure can be adjusted as development progresses.
@@ -193,17 +192,24 @@ Those belong in n8n.
 
 # 8. Database Setup
 
-PostgreSQL should be the primary database.
+MySQL should be installed and running locally on the development PC. Docker is not required.
 
 The application should use a database URL stored in an environment variable.
 
 Example:
 
 ```env
-DATABASE_URL=postgresql://username:password@localhost:5432/real_estate_leads
+DATABASE_URL=mysql+aiomysql://root:1234@localhost:3306/real_estate_leads
+DATABASE_URL_SYNC=mysql+pymysql://root:1234@localhost:3306/real_estate_leads
 ```
 
 Credentials must not be committed to Git.
+
+Create the database once in MySQL:
+
+```sql
+CREATE DATABASE real_estate_leads CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
 
 ---
 
@@ -230,14 +236,12 @@ Verify tables
 Example:
 
 ```bash
+cd backend
 alembic revision --autogenerate -m "initial schema"
-```
-
-Then:
-
-```bash
 alembic upgrade head
 ```
+
+Run these commands from `backend` with the project virtual environment activated.
 
 ---
 

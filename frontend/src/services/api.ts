@@ -39,8 +39,10 @@ export type Lead = {
   transaction_type?: string;
   bedrooms?: number;
   location?: string;
+  budget_min?: number;
   budget_max?: number;
   currency?: string;
+
   timeline?: string;
   status: string;
   classification?: string;

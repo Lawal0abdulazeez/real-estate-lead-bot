@@ -36,7 +36,9 @@ async def create_conversation(
     )
     db.add(conv)
     await db.flush()
+    await db.refresh(conv)
     return conv
+
 
 
 async def get_conversation(

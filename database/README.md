@@ -1,6 +1,6 @@
 # Database
 
-PostgreSQL is the primary source of truth.
+MySQL is the primary source of truth.
 
 ## Primary tables (from Database & Data Model Specification)
 

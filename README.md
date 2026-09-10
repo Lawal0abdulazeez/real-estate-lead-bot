@@ -55,7 +55,7 @@ AI PROCESSING
    ↓
 LEAD QUALIFICATION
    ↓
-POSTGRESQL DATABASE
+MYSQL DATABASE
    ↓
 SALES TEAM
    ↓
@@ -133,7 +133,7 @@ I want to buy within the next two months.
 | Frontend | React | Customer interface and sales dashboard |
 | Backend | FastAPI / Python | API and application logic |
 | Automation | n8n | Workflow orchestration |
-| Database | PostgreSQL | Main source of truth |
+| Database | MySQL | Main source of truth |
 | AI | LLM | Understanding and generating responses |
 | Reporting | Google Sheets | Operational/reporting projection |
 | API Format | REST / JSON | Communication between services |

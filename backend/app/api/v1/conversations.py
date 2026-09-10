@@ -59,10 +59,20 @@ async def post_message(
     conv = await conv_service.get_conversation(db, conversation_id)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    msg = await msg_service.create_customer_message(
-        db,
-        conversation_id=conversation_id,
-        lead_id=conv.lead_id,
-        data=payload,
-    )
+
+    sender = (payload.sender_type or "CUSTOMER").upper()
+    if sender == "BOT":
+        msg = await msg_service.create_bot_message(
+            db,
+            conversation_id=conversation_id,
+            content=payload.content,
+        )
+    else:
+        msg = await msg_service.create_customer_message(
+            db,
+            conversation_id=conversation_id,
+            lead_id=conv.lead_id,
+            data=payload,
+        )
     return msg
+

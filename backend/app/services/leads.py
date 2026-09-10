@@ -41,6 +41,7 @@ async def create_lead(db: AsyncSession, data: LeadCreate) -> Lead:
     )
     db.add(activity)
     await db.flush()
+    await db.refresh(lead)
     return lead
 
 
@@ -80,6 +81,7 @@ async def update_lead(db: AsyncSession, lead: Lead, data: LeadUpdate) -> Lead:
             value = str(value)
         setattr(lead, key, value)
     await db.flush()
+    await db.refresh(lead)
     return lead
 
 
@@ -110,4 +112,48 @@ async def qualify_lead(db: AsyncSession, lead: Lead) -> LeadScore:
     )
     db.add(activity)
     await db.flush()
+    await db.refresh(score_row)
+    await db.refresh(lead)
     return score_row
+
+
+async def create_activity(
+    db: AsyncSession,
+    lead_id: UUID,
+    *,
+    actor_type: str = "SYSTEM",
+    actor_id: Optional[UUID] = None,
+    activity_type: str,
+    description: Optional[str] = None,
+    metadata: Optional[dict] = None,
+) -> Activity:
+    act = Activity(
+        lead_id=lead_id,
+        actor_type=actor_type,
+        actor_id=actor_id,
+        activity_type=activity_type,
+        description=description,
+        metadata_=metadata,
+    )
+    db.add(act)
+    await db.flush()
+    await db.refresh(act)
+    return act
+
+
+
+async def list_activities(
+    db: AsyncSession,
+    lead_id: UUID,
+    *,
+    limit: int = 50,
+) -> list[Activity]:
+    query = (
+        select(Activity)
+        .where(Activity.lead_id == lead_id)
+        .order_by(Activity.created_at.desc())
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    return list(result.scalars().all())
+

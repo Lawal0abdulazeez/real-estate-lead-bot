@@ -15,6 +15,12 @@ type UiMessage = {
   content: string;
 };
 
+const SUGGESTIONS = [
+  "Looking for a 3-bedroom apartment in Lekki around ₦85m to buy within 2 months",
+  "I want to rent a 2-bedroom flat in Ikeja GRA with a budget of ₦5m per year",
+  "Interested in 2 plots of commercial land in Epe for investment",
+];
+
 export default function ChatPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([
@@ -24,8 +30,10 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<UiMessage[]>(messages);
 
   useEffect(() => {
+    messagesRef.current = messages;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
 
@@ -36,9 +44,16 @@ export default function ChatPage() {
     return conv.id;
   }
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
+  function handleReset() {
+    setConversationId(null);
+    setMessages([{ id: `welcome-${Date.now()}`, sender_type: "BOT", content: WELCOME }]);
+    setInput("");
+    setError(null);
+  }
+
+  async function onSubmit(e?: FormEvent, customText?: string) {
+    if (e) e.preventDefault();
+    const text = (customText ?? input).trim();
     if (!text || sending) return;
 
     setError(null);
@@ -62,7 +77,7 @@ export default function ChatPage() {
         )
       );
 
-      // Poll briefly for bot reply (n8n may write it back)
+      // Poll for bot reply from n8n
       await pollForBotReply(convId, msg.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send message");
@@ -72,15 +87,16 @@ export default function ChatPage() {
   }
 
   async function pollForBotReply(convId: string, afterId: string) {
-    for (let i = 0; i < 8; i++) {
-      await new Promise((r) => setTimeout(r, 1200));
+    for (let i = 0; i < 12; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
       try {
         const res = await getMessages(convId);
+        const currentIds = new Set(messagesRef.current.map((m) => m.id));
         const bots = res.items.filter(
           (m: Message) =>
             m.sender_type === "BOT" &&
             m.id !== afterId &&
-            !messages.some((x) => x.id === m.id)
+            !currentIds.has(m.id)
         );
         if (bots.length) {
           setMessages((prev) => {
@@ -100,16 +116,24 @@ export default function ChatPage() {
         /* ignore poll errors */
       }
     }
-    // Fallback acknowledgement if n8n hasn't responded yet
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `ack-${Date.now()}`,
-        sender_type: "BOT",
-        content:
-          "Thanks! I've received your message and our system is processing it. A sales specialist will follow up if needed.",
-      },
-    ]);
+
+    // Fallback acknowledgement if bot hasn't replied yet
+    setMessages((prev) => {
+      // only add if no bot reply arrived
+      const hasRecentBot = prev.some(
+        (m, idx) => idx > 0 && m.sender_type === "BOT"
+      );
+      if (hasRecentBot) return prev;
+      return [
+        ...prev,
+        {
+          id: `ack-${Date.now()}`,
+          sender_type: "BOT",
+          content:
+            "Thank you! Your requirements have been captured and forwarded to our PrimeHomes property advisory team. We will reach out with matching options shortly.",
+        },
+      ];
+    });
   }
 
   return (
@@ -117,8 +141,25 @@ export default function ChatPage() {
       {error && <div className="error-banner">{error}</div>}
       <div className="card chat-layout">
         <div className="chat-header">
-          <h1>Real Estate Assistant</h1>
-          <p>Describe what you're looking for in natural language</p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h1>PrimeHomes Property Assistant</h1>
+              <p>Tell us your property requirements, budget, and preferred location.</p>
+            </div>
+            <button
+              onClick={handleReset}
+              className="btn"
+              style={{
+                fontSize: "0.8rem",
+                padding: "0.4rem 0.8rem",
+                background: "white",
+                border: "1px solid var(--neutral-300)",
+              }}
+              title="Start a new chat session"
+            >
+              New Chat
+            </button>
+          </div>
         </div>
 
         <div className="messages">
@@ -146,16 +187,40 @@ export default function ChatPage() {
           <div ref={bottomRef} />
         </div>
 
+        {messages.length <= 1 && (
+          <div style={{ padding: "0 1rem 0.75rem", display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+            {SUGGESTIONS.map((s, i) => (
+              <button
+                key={i}
+                type="button"
+                className="btn"
+                style={{
+                  fontSize: "0.78rem",
+                  padding: "0.35rem 0.75rem",
+                  background: "var(--orange-50)",
+                  border: "1px solid var(--orange-200)",
+                  color: "var(--orange-700)",
+                  textAlign: "left",
+                }}
+                onClick={() => onSubmit(undefined, s)}
+                disabled={sending}
+              >
+                💡 {s}
+              </button>
+            ))}
+          </div>
+        )}
+
         <form className="composer" onSubmit={onSubmit}>
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="e.g. I want a 3-bedroom apartment in Lekki under ₦80m"
+            placeholder="e.g. Looking for a 3-bedroom apartment around Lekki, budget ₦80m..."
             disabled={sending}
             autoFocus
           />
           <button className="btn btn-primary" type="submit" disabled={sending || !input.trim()}>
-            Send
+            {sending ? "Processing…" : "Send"}
           </button>
         </form>
       </div>
