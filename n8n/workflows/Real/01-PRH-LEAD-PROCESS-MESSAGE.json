@@ -494,7 +494,11 @@
         "url": "={{ $env.SALES_NOTIFY_WEBHOOK_URL }}",
         "options": {
           "timeout": 10000
-        }
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "headerParametersJson": "{\"Content-Type\": \"application/json\"}",
+        "bodyParametersJson": "={{ JSON.stringify({ event: 'LEAD_QUALIFIED', lead_id: $('Normalize Event').item.json.lead_id, score: $json.score || 85, classification: 'HOT', timestamp: new Date().toISOString() }) }}"
       },
       "id": "81a93857-f4e4-443c-97b1-462feabe1b98",
       "name": "Notify Sales",
@@ -503,7 +507,8 @@
       "position": [
         -3968,
         0
-      ]
+      ],
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -523,7 +528,8 @@
       "position": [
         -3744,
         192
-      ]
+      ],
+      "continueOnFail": true
     },
     {
       "parameters": {

@@ -68,20 +68,23 @@ def main():
     print(f"{YELLOW}  PrimeHomes Real Estate Lead Bot - Unified Runner        {RESET}")
     print(f"{CYAN}=========================================================={RESET}")
 
-    # 1. Check MySQL connection cleanly
+    # 1. Check MySQL connection & ensure tables exist
     sys.path.insert(0, BACKEND_DIR)
     try:
         import asyncio
+        from app.db.base import Base
         from app.db.session import engine
+        from app.models import Activity, Conversation, FollowUp, Lead, LeadScore, Message  # noqa: F401
         from sqlalchemy import text
 
-        async def test_conn():
-            async with engine.connect() as conn:
+        async def init_db():
+            async with engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
+                await conn.run_sync(Base.metadata.create_all)
             await engine.dispose()
 
-        asyncio.run(test_conn())
-        print(f"{GREEN}[OK] MySQL Database connected successfully.{RESET}")
+        asyncio.run(init_db())
+        print(f"{GREEN}[OK] MySQL Database connected & tables verified successfully.{RESET}")
     except Exception as e:
         print(f"{YELLOW}[WARN] MySQL warning: {e}{RESET}")
         print(f"{YELLOW}       (Ensure MySQL80 service is running if DB operations fail){RESET}")
@@ -97,12 +100,21 @@ def main():
     llm_key = os.environ.get("LLM_API_KEY") or os.environ.get("GROQ_API_KEY") or os.environ.get("AI_API_KEY") or ""
     llm_base = os.environ.get("LLM_BASE_URL") or os.environ.get("GROQ_BASE_URL") or os.environ.get("AI_BASE_URL") or "https://api.groq.com/openai/v1"
     llm_model = os.environ.get("LLM_MODEL") or os.environ.get("GROQ_MODEL") or os.environ.get("AI_MODEL") or "openai/gpt-oss-120b"
+    api_base = os.environ.get("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+    internal_token = os.environ.get("FASTAPI_INTERNAL_TOKEN", "primehomes-internal-dev-token")
 
     n8n_env = os.environ.copy()
     n8n_env.update({
-        "N8N_ENV_VARS_EXPRESSION_ALLOW": "API_BASE_URL,LLM_BASE_URL,QUALIFY_WEBHOOK_URL,SALES_NOTIFY_WEBHOOK_URL,FASTAPI_INTERNAL_TOKEN,LLM_API_KEY,N8N_INTERNAL_TOKEN,LLM_MODEL,N8N_CONTEXT_MESSAGE_LIMIT,GROQ_API_KEY,GROQ_BASE_URL,GROQ_MODEL,AI_API_KEY,AI_BASE_URL,AI_MODEL",
+        "N8N_ENV_VARS_EXPRESSION_ALLOW": (
+            "API_BASE_URL,LLM_BASE_URL,QUALIFY_WEBHOOK_URL,SALES_NOTIFY_WEBHOOK_URL,"
+            "FASTAPI_INTERNAL_TOKEN,LLM_API_KEY,N8N_INTERNAL_TOKEN,LLM_MODEL,"
+            "N8N_CONTEXT_MESSAGE_LIMIT,GROQ_API_KEY,GROQ_BASE_URL,GROQ_MODEL,"
+            "AI_API_KEY,AI_BASE_URL,AI_MODEL,RECORD_ACTIVITY_URL,QUALIFICATION_API_URL,"
+            "SAVE_SCORE_HISTORY_URL,SALES_FALLBACK_WEBHOOK_URL,FOLLOWUP_NOTIFY_WEBHOOK_URL,"
+            "GOOGLE_SHEET_ID,GOOGLE_SHEET_NAME"
+        ),
         "N8N_BLOCK_ENV_ACCESS_IN_NODE": "false",
-        "API_BASE_URL": os.environ.get("API_BASE_URL", "http://127.0.0.1:8000"),
+        "API_BASE_URL": api_base,
         "N8N_BASE_URL": os.environ.get("N8N_BASE_URL", "http://127.0.0.1:5678"),
         "N8N_PORT": os.environ.get("N8N_PORT", "5678"),
         "N8N_HOST": os.environ.get("N8N_HOST", "localhost"),
@@ -119,8 +131,17 @@ def main():
         "LLM_MODEL": llm_model,
         "GROQ_MODEL": llm_model,
         "AI_MODEL": llm_model,
-        "SALES_NOTIFY_WEBHOOK_URL": os.environ.get("SALES_NOTIFY_WEBHOOK_URL", "http://127.0.0.1:8000/api/v1/health"),
-        "QUALIFY_WEBHOOK_URL": os.environ.get("QUALIFY_WEBHOOK_URL", "http://127.0.0.1:8000/api/v1/leads"),
+        "FASTAPI_INTERNAL_TOKEN": internal_token,
+        "N8N_INTERNAL_TOKEN": os.environ.get("N8N_INTERNAL_TOKEN", internal_token),
+        "RECORD_ACTIVITY_URL": os.environ.get("RECORD_ACTIVITY_URL", f"{api_base}/api/v1/activities"),
+        "QUALIFICATION_API_URL": os.environ.get("QUALIFICATION_API_URL", f"{api_base}/api/v1/qualification/calculate"),
+        "SAVE_SCORE_HISTORY_URL": os.environ.get("SAVE_SCORE_HISTORY_URL", f"{api_base}/api/v1/qualification/score-history"),
+        "QUALIFY_WEBHOOK_URL": os.environ.get("QUALIFY_WEBHOOK_URL", "http://127.0.0.1:5678/webhook/prh-lead-qualify"),
+        "SALES_NOTIFY_WEBHOOK_URL": os.environ.get("SALES_NOTIFY_WEBHOOK_URL", "http://127.0.0.1:5678/webhook/prh-lead-notify-sales"),
+        "SALES_FALLBACK_WEBHOOK_URL": os.environ.get("SALES_FALLBACK_WEBHOOK_URL", f"{api_base}/api/v1/qualification/notifications/sales"),
+        "FOLLOWUP_NOTIFY_WEBHOOK_URL": os.environ.get("FOLLOWUP_NOTIFY_WEBHOOK_URL", f"{api_base}/api/v1/qualification/notifications/sales"),
+        "GOOGLE_SHEET_ID": os.environ.get("GOOGLE_SHEET_ID", ""),
+        "GOOGLE_SHEET_NAME": os.environ.get("GOOGLE_SHEET_NAME", "Leads"),
     })
 
     n8n_cmd = "n8n.cmd" if os.name == "nt" else "n8n"

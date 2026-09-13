@@ -1,0 +1,506 @@
+{
+  "name": "PRH-LEAD-NOTIFY-SALES",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prh-lead-notify-sales",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "456ec37c-8cc1-450c-9bb1-d66e10382965",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$json.body ?? $json;\nconst required=['event','lead_id','score','classification','timestamp'];\nconst missing=required.filter(k=>b[k]===undefined||b[k]===null||b[k]==='');\nif(missing.length) return [{json:{valid:false,code:'INVALID_EVENT',message:'Required event fields are missing.',missing}}];\nif(b.event!=='LEAD_QUALIFIED') return [{json:{valid:false,code:'INVALID_EVENT',message:'Unsupported event type.',event:b.event}}];\nif(!['HOT'].includes(String(b.classification).toUpperCase())) return [{json:{valid:false,code:'NOT_HOT_LEAD',message:'Sales notification is only triggered for HOT leads.',lead_id:b.lead_id,classification:b.classification}}];\nreturn [{json:{...b,valid:true}}];"
+      },
+      "id": "8ed11d00-51ea-4a10-b92d-21dd16312576",
+      "name": "Validate Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "155978a8-84b3-43bf-957d-ff2071c42f08",
+      "name": "Validation Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {success:false, code:$json.code, message:$json.message, lead_id:$json.lead_id || null} }}",
+        "options": {}
+      },
+      "id": "728fcaea-1a28-4aaf-882c-e06a93d58989",
+      "name": "Return Invalid / Not HOT",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 2,
+      "position": [
+        660,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.API_BASE_URL + \"/api/v1/leads/\" + $json.lead_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ \"Bearer \" + $env.FASTAPI_INTERNAL_TOKEN }}"
+            },
+            {
+              "name": "X-N8N-Internal-Token",
+              "value": "={{ $env.N8N_INTERNAL_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "id": "e91483b5-90cf-4821-8289-3315b28a79bd",
+      "name": "Get Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const e=$('Validation Check').item.json;\nconst lead=$json.data ?? $json;\nconst money=(v,c='NGN')=>v==null?'Not provided':`${c==='NGN'?'\u20a6':c+' '}${Number(v).toLocaleString('en-NG')}`;\nconst property=[lead.bedrooms?`${lead.bedrooms}-bedroom`:null,lead.property_type?String(lead.property_type).toLowerCase():null].filter(Boolean).join(' ');\nconst notification=`\ud83d\udd25 HOT LEAD\\n\\nName: ${lead.customer_name ?? lead.name ?? 'Not provided'}\\nProperty: ${property || 'Not specified'}\\nLocation: ${lead.location ?? 'Not provided'}\\nBudget: ${money(lead.budget_max ?? lead.budget, lead.currency ?? 'NGN')}\\nTimeline: ${lead.timeline ?? 'Not provided'}\\nScore: ${e.score}\\n\\nAction: Contact customer promptly.`;\nreturn [{json:{event:'HOT_LEAD_NOTIFICATION',lead_id:e.lead_id,score:e.score,classification:e.classification,timestamp:e.timestamp,notification,lead}}];"
+      },
+      "id": "7b9cd890-57a1-48b8-b093-0e42b60a18fe",
+      "name": "Build Sales Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SALES_NOTIFY_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-N8N-Internal-Token",
+              "value": "={{ $env.N8N_INTERNAL_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ {event:$json.event,lead_id:$json.lead_id,score:$json.score,classification:$json.classification,timestamp:$json.timestamp,message:$json.notification,lead:$json.lead} }}",
+        "options": {
+          "timeout": 10000
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 2000,
+        "continueOnFail": true
+      },
+      "id": "a9329d9d-7237-4b19-aa5b-c6e3bdd4abdf",
+      "name": "Send Sales Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const src=$('Build Sales Notification').item.json;\nconst r=$json;\nconst failed=Boolean(r.error)||Number(r.statusCode)>=400;\nreturn [{json:{...src,notification_status:failed?'FAILED':'SENT',notification_error:failed?(r.error?.message||r.message||`HTTP ${r.statusCode}`):null}}];"
+      },
+      "id": "7bf0260c-8d77-44e7-ab99-a0096c775cce",
+      "name": "Check Notification Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.notification_status }}",
+              "rightValue": "FAILED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b740bfb2-3e50-4089-9f34-b3aed4ac256c",
+      "name": "Notification Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RECORD_ACTIVITY_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ \"Bearer \" + $env.FASTAPI_INTERNAL_TOKEN }}"
+            },
+            {
+              "name": "X-N8N-Internal-Token",
+              "value": "={{ $env.N8N_INTERNAL_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ {lead_id:$json.lead_id,activity_type:\"NOTIFICATION_FAILED\",description:\"Sales notification failed\",metadata:{error:$json.notification_error,classification:$json.classification}} }}",
+        "options": {
+          "timeout": 10000
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000,
+        "continueOnFail": true
+      },
+      "id": "571625d0-4c6f-4fd4-9abf-af9f40b2f70a",
+      "name": "Record Notification Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SALES_FALLBACK_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-N8N-Internal-Token",
+              "value": "={{ $env.N8N_INTERNAL_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ {event:\"HOT_LEAD_NOTIFICATION_FALLBACK\",lead_id:$json.lead_id,score:$json.score,classification:$json.classification,message:$json.notification,error:$json.notification_error,timestamp:$json.timestamp} }}",
+        "options": {
+          "timeout": 10000
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 2000,
+        "continueOnFail": true
+      },
+      "id": "f29745a2-9877-4b2a-9098-18df30371a6d",
+      "name": "Fallback Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RECORD_ACTIVITY_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ \"Bearer \" + $env.FASTAPI_INTERNAL_TOKEN }}"
+            },
+            {
+              "name": "X-N8N-Internal-Token",
+              "value": "={{ $env.N8N_INTERNAL_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ {lead_id:$json.lead_id,activity_type:\"SALES_NOTIFICATION_SENT\",description:\"HOT lead sales notification sent\",metadata:{score:$json.score,classification:$json.classification}} }}",
+        "options": {
+          "timeout": 10000
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000,
+        "continueOnFail": true
+      },
+      "id": "49013e87-3d11-47b0-9bef-c4e1062ebc5f",
+      "name": "Record Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {success:true,event:\"LEAD_QUALIFIED\",lead_id:$json.lead_id,score:$json.score,classification:$json.classification,notification_status:$json.notification_status,timestamp:$json.timestamp} }}",
+        "options": {}
+      },
+      "id": "ce9e08dc-3237-43dc-ac83-710e7128f789",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        -180
+      ]
+    }
+  ],
+  "pinData": {
+    "Webhook Trigger": [
+      {
+        "json": {
+          "event": "LEAD_QUALIFIED",
+          "lead_id": "lead-001",
+          "score": 85,
+          "classification": "HOT",
+          "timestamp": "2026-09-03T10:40:00Z"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "456ec37c-8cc1-450c-9bb1-d66e10382965": {
+      "main": [
+        [
+          {
+            "node": "Validate Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8ed11d00-51ea-4a10-b92d-21dd16312576": {
+      "main": [
+        [
+          {
+            "node": "Validation Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "155978a8-84b3-43bf-957d-ff2071c42f08": {
+      "main": [
+        [
+          {
+            "node": "Get Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid / Not HOT",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "e91483b5-90cf-4821-8289-3315b28a79bd": {
+      "main": [
+        [
+          {
+            "node": "Build Sales Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7b9cd890-57a1-48b8-b093-0e42b60a18fe": {
+      "main": [
+        [
+          {
+            "node": "Send Sales Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "a9329d9d-7237-4b19-aa5b-c6e3bdd4abdf": {
+      "main": [
+        [
+          {
+            "node": "Check Notification Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7bf0260c-8d77-44e7-ab99-a0096c775cce": {
+      "main": [
+        [
+          {
+            "node": "Notification Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "b740bfb2-3e50-4089-9f34-b3aed4ac256c": {
+      "main": [
+        [
+          {
+            "node": "Record Activity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Notification Failure",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "571625d0-4c6f-4fd4-9abf-af9f40b2f70a": {
+      "main": [
+        [
+          {
+            "node": "Fallback Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "f29745a2-9877-4b2a-9098-18df30371a6d": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "49013e87-3d11-47b0-9bef-c4e1062ebc5f": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9f094c2c-b899-4519-9395-75b2d6833b56",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

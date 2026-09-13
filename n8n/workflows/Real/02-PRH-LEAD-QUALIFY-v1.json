@@ -1,0 +1,782 @@
+{
+  "name": "PRH-LEAD-QUALIFY-v1",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prh-lead-qualify",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "4b8cec0c-db2c-4df6-8310-3d7e057c6fd1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body=$json.body??$json; const required=['event','lead_id','timestamp']; const missing=required.filter(k=>body[k]===undefined||body[k]===null||body[k]===''); return [{json:missing.length?{valid:false,error:{code:'INVALID_EVENT',message:'Required qualification event fields are missing.',missing}}:{valid:true,event:body.event,lead_id:body.lead_id,timestamp:body.timestamp,request_id:body.request_id??null}}];"
+      },
+      "id": "e5876750-17e4-48e9-b7ba-3c6cc61d4051",
+      "name": "Validate Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "856a1413-3374-4fee-8d27-02a67fa54e93",
+              "leftValue": "={{$json.valid}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f378743b-85e8-40e9-b0bf-1456158c999f",
+      "name": "Validation Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json.error}}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "09cee53a-ebf1-4a2b-91a0-508500daaf20",
+      "name": "Return Invalid Event",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.API_BASE_URL + '/api/v1/leads/' + $json.lead_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.FASTAPI_INTERNAL_TOKEN}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "7e0601da-603e-41c9-8601-58ecf2f24b2a",
+      "name": "Get Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead=$json; const missing=[]; if(!lead.transaction_type)missing.push('transaction_type'); if(!lead.property_type)missing.push('property_type'); if(!lead.location)missing.push('location'); if(lead.budget_min==null&&lead.budget_max==null)missing.push('budget'); if(!lead.timeline)missing.push('timeline'); if(!lead.email&&!lead.phone)missing.push('contact'); return [{json:{...lead,qualification_ready:missing.length===0,missing_fields:missing}}];"
+      },
+      "id": "9d8c879c-00b5-4132-b46c-657fcea7267a",
+      "name": "Check Required Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "677223ad-d9df-4d58-af29-2c920e246827",
+              "leftValue": "={{$json.qualification_ready}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "655a43a9-6db8-41aa-9eff-5a6f69281af1",
+      "name": "Qualification Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RECORD_ACTIVITY_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.FASTAPI_INTERNAL_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "body",
+              "value": "={{ { lead_id: $json.id || $json.lead_id, activity_type: 'QUALIFICATION_INCOMPLETE', description: 'Lead is missing required qualification information.', metadata: { missing_fields: $json.missing_fields } } }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "388064a2-2ef1-44e6-8abd-f55b3f6bbbdd",
+      "name": "Record Incomplete Qualification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        500,
+        180
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { event: 'LEAD_QUALIFICATION_PENDING', lead_id: $('Check Required Data').item.json.id || $('Check Required Data').item.json.lead_id, qualification_ready: false, missing_fields: $('Check Required Data').item.json.missing_fields } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a9faa972-71e2-4bf5-be6e-ba3da5cca253",
+      "name": "Return Qualification Pending",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 2,
+      "position": [
+        740,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.QUALIFICATION_API_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.FASTAPI_INTERNAL_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "body",
+              "value": "={{ { lead_id: $('Check Required Data').item.json.id || $('Check Required Data').item.json.lead_id } }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "f6b2f4eb-65b9-42b2-9dc3-f2c2b2070521",
+      "name": "Calculate Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        500,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r=$json; const score=Number(r.score); if(!Number.isFinite(score)||score<0||score>100)throw new Error('Invalid qualification score. Expected 0-100.'); if(!['HOT','WARM','COLD','UNQUALIFIED'].includes(r.classification))throw new Error('Invalid lead classification.'); return [{json:{...r,score,classification:r.classification}}];"
+      },
+      "id": "6641e351-cd90-47e4-93b4-deb2e853f62c",
+      "name": "Validate Qualification Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$env.API_BASE_URL + '/api/v1/leads/' + ($json.lead_id || $('Check Required Data').item.json.id || $('Check Required Data').item.json.lead_id)}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.FASTAPI_INTERNAL_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "body",
+              "value": "={{ { score: $json.score, classification: $json.classification } }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "82ba63b4-4b72-44c5-83e3-2f802d080ed4",
+      "name": "Update Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        980,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SAVE_SCORE_HISTORY_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.FASTAPI_INTERNAL_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "body",
+              "value": "={{ { lead_id: $json.lead_id || $('Check Required Data').item.json.id || $('Check Required Data').item.json.lead_id, score: $json.score, classification: $json.classification, reason: $json.reason || null } }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "c3b14205-eeba-405c-8c75-f7c3b001d6e2",
+      "name": "Save Score History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        -40
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RECORD_ACTIVITY_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.FASTAPI_INTERNAL_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "body",
+              "value": "={{ { lead_id: $json.lead_id || $('Check Required Data').item.json.id || $('Check Required Data').item.json.lead_id, activity_type: 'LEAD_QUALIFIED', description: 'Lead qualification completed.', metadata: { score: $json.score, classification: $json.classification } } }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "c73d2890-15ee-4dcb-a657-a6bbbe382772",
+      "name": "Create Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        -40
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f10fbc3c-164a-43d0-be3d-afe6f2d210c4",
+                    "leftValue": "={{$json.classification}}",
+                    "rightValue": "HOT",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "79590e46-7164-4991-a3a3-357772c2ff3c",
+                    "leftValue": "={{$json.classification}}",
+                    "rightValue": "WARM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "8709d944-a3f3-4f8b-bc4d-8efc80de95b4",
+                    "leftValue": "={{$json.classification}}",
+                    "rightValue": "COLD",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cdd08adf-469b-42ef-8e12-33e62f338f06",
+                    "leftValue": "={{$json.classification}}",
+                    "rightValue": "UNQUALIFIED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3d6cb4a3-552a-4cdf-a63d-a55307edb40a",
+      "name": "Route Classification",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SALES_NOTIFY_WEBHOOK_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.N8N_INTERNAL_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "body",
+              "value": "={{ { event: 'LEAD_QUALIFIED', lead_id: $json.lead_id, score: $json.score, classification: 'HOT', timestamp: new Date().toISOString() } }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "e8bb642c-c93e-4314-96c2-8ae7785f036f",
+      "name": "HOT \u2192 Notify Sales",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1940,
+        -220
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{json:{event:'LEAD_QUALIFIED',lead_id:$json.lead_id,score:$json.score,classification:'HOT',next_action:'SALES_NOTIFICATION',notification_triggered:true}}];"
+      },
+      "id": "844c8d80-997a-4d9e-865a-fa3b714ad55f",
+      "name": "HOT Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2180,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{json:{event:'LEAD_QUALIFIED',lead_id:$json.lead_id,score:$json.score,classification:$json.classification,next_action:$json.classification==='WARM'?'STANDARD_FOLLOW_UP':$json.classification==='COLD'?'NURTURE_FOLLOW_UP':'CONTINUE_INFORMATION_COLLECTION'}}];"
+      },
+      "id": "94898c29-3de5-48b3-b561-e4a19e328f65",
+      "name": "Normal Route Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1940,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "f3fa734d-c1d5-4973-8733-ec51f8d632ef",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        -40
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Event": {
+      "main": [
+        [
+          {
+            "node": "Validation Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Check": {
+      "main": [
+        [
+          {
+            "node": "Get Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Lead": {
+      "main": [
+        [
+          {
+            "node": "Check Required Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Required Data": {
+      "main": [
+        [
+          {
+            "node": "Qualification Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qualification Ready?": {
+      "main": [
+        [
+          {
+            "node": "Calculate Score",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Incomplete Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Incomplete Qualification": {
+      "main": [
+        [
+          {
+            "node": "Return Qualification Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Score": {
+      "main": [
+        [
+          {
+            "node": "Validate Qualification Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Qualification Result": {
+      "main": [
+        [
+          {
+            "node": "Update Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead": {
+      "main": [
+        [
+          {
+            "node": "Save Score History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Score History": {
+      "main": [
+        [
+          {
+            "node": "Create Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Activity": {
+      "main": [
+        [
+          {
+            "node": "Route Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Classification": {
+      "main": [
+        [
+          {
+            "node": "HOT \u2192 Notify Sales",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normal Route Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normal Route Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normal Route Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HOT \u2192 Notify Sales": {
+      "main": [
+        [
+          {
+            "node": "HOT Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HOT Result": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normal Route Result": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "timezone": "Africa/Lagos"
+  },
+  "versionId": "5caf00f8-0056-4bf8-b099-78e1a2266311",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

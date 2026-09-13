@@ -1,0 +1,418 @@
+{
+  "name": "PRH-SHEET-SYNC-LEAD",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prh-sheet-sync-lead",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\nconst required = ['event', 'lead_id'];\nconst missing = required.filter(k => body[k] === undefined || body[k] === null || body[k] === '');\nconst allowed = ['LEAD_CREATED', 'LEAD_UPDATED', 'LEAD_QUALIFIED', 'LEAD_ASSIGNED'];\nif (missing.length) return [{json:{valid:false,code:'INVALID_EVENT',message:'Required fields are missing.',missing}}];\nif (!allowed.includes(body.event)) return [{json:{valid:false,code:'INVALID_EVENT',message:'Unsupported lead sync event.',event:body.event}}];\nreturn [{json:{valid:true,event:body.event,lead_id:body.lead_id,request_id:body.request_id ?? null,received_at:new Date().toISOString()}}];"
+      },
+      "id": "2",
+      "name": "Validate Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -780,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.valid}}",
+              "operation": "true"
+            }
+          ]
+        }
+      },
+      "id": "3",
+      "name": "Validation Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL + '/api/v1/leads/' + $json.lead_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.FASTAPI_INTERNAL_TOKEN}}"
+            },
+            {
+              "name": "X-N8N-Internal-Token",
+              "value": "={{$env.N8N_INTERNAL_TOKEN}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "4",
+      "name": "Get Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -340,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $json;\nconst budget = lead.budget_max ?? lead.budget_min ?? lead.budget ?? null;\nreturn [{json:{lead_id:lead.id ?? lead.lead_id,name:lead.name ?? lead.customer_name ?? '',email:lead.email ?? '',phone:lead.phone ?? '',property_type:lead.property_type ?? '',bedrooms:lead.bedrooms ?? '',location:lead.location ?? '',budget:budget === null ? '' : budget,transaction_type:lead.transaction_type ?? '',timeline:lead.timeline ?? '',score:lead.score ?? '',classification:lead.classification ?? '',status:lead.status ?? '',assigned_agent:lead.assigned_agent ?? lead.assigned_agent_name ?? '',source:lead.source ?? '',created_at:lead.created_at ?? '',updated_at:lead.updated_at ?? ''}}];"
+      },
+      "id": "5",
+      "name": "Prepare Sheet Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{$env.GOOGLE_SHEET_ID}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{$env.GOOGLE_SHEET_NAME || 'Leads'}}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "6",
+      "name": "Get Existing Sheet Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        100,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PRIMEHOMES_GOOGLE_SHEETS",
+          "name": "PrimeHomes Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('Prepare Sheet Row').first().json;\nconst found = $input.all().some(i => String(i.json['Lead ID'] ?? i.json.lead_id ?? '') === String(lead.lead_id));\nreturn [{json:{...lead,row_exists:found}}];"
+      },
+      "id": "7",
+      "name": "Check Lead ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{$env.GOOGLE_SHEET_ID}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{$env.GOOGLE_SHEET_NAME || 'Leads'}}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Lead ID": "={{$json.lead_id}}",
+            "Name": "={{$json.name}}",
+            "Email": "={{$json.email}}",
+            "Phone": "={{$json.phone}}",
+            "Property Type": "={{$json.property_type}}",
+            "Bedrooms": "={{$json.bedrooms}}",
+            "Location": "={{$json.location}}",
+            "Budget": "={{$json.budget}}",
+            "Transaction Type": "={{$json.transaction_type}}",
+            "Timeline": "={{$json.timeline}}",
+            "Score": "={{$json.score}}",
+            "Classification": "={{$json.classification}}",
+            "Status": "={{$json.status}}",
+            "Assigned Agent": "={{$json.assigned_agent}}",
+            "Source": "={{$json.source}}",
+            "Created At": "={{$json.created_at}}",
+            "Updated At": "={{$json.updated_at}}"
+          },
+          "matchingColumns": [
+            "Lead ID"
+          ]
+        },
+        "options": {}
+      },
+      "id": "8",
+      "name": "Upsert Lead Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        540,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PRIMEHOMES_GOOGLE_SHEETS",
+          "name": "PrimeHomes Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('Check Lead ID').first().json;\nreturn [{json:{...lead,sync_action:lead.row_exists ? 'UPDATED' : 'CREATED'}}];"
+      },
+      "id": "9",
+      "name": "Build Sync Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RECORD_ACTIVITY_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.FASTAPI_INTERNAL_TOKEN}}"
+            },
+            {
+              "name": "X-N8N-Internal-Token",
+              "value": "={{$env.N8N_INTERNAL_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { lead_id: $('Build Sync Result').first().json.lead_id, activity_type: 'SHEET_SYNC', description: 'Lead synchronized to Google Sheets.', metadata: { action: $('Build Sync Result').first().json.sync_action, event: $('Build Sync Result').first().json.event } } }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "10",
+      "name": "Record Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, workflow: 'PRH-SHEET-SYNC-LEAD', lead_id: $('Build Sync Result').first().json.lead_id, action: $('Build Sync Result').first().json.sync_action } }}",
+        "options": {}
+      },
+      "id": "11",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, code: $json.code, message: $json.message, missing: $json.missing || [] } }}",
+        "options": {}
+      },
+      "id": "12",
+      "name": "Return Invalid Event",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1420,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Validate Event": {
+      "main": [
+        [
+          {
+            "node": "Validation Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Validation Check": {
+      "main": [
+        [
+          {
+            "node": "Get Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Lead": {
+      "main": [
+        [
+          {
+            "node": "Prepare Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Prepare Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Sheet Rows",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Get Existing Sheet Rows": {
+      "main": [
+        [
+          {
+            "node": "Check Lead ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Check Lead ID": {
+      "main": [
+        [
+          {
+            "node": "Upsert Lead Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Upsert Lead Row": {
+      "main": [
+        [
+          {
+            "node": "Build Sync Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Build Sync Result": {
+      "main": [
+        [
+          {
+            "node": "Record Activity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Record Activity": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "versionId": "prh-sheet-sync-lead-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "tags": []
+}

@@ -1,0 +1,440 @@
+{
+  "name": "PRH-FOLLOWUP-REMINDER",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "a1319ed0-ddc1-44d3-a123-ff4c38bb1992",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.API_BASE_URL}}/api/v1/follow-ups/due",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.FASTAPI_INTERNAL_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "fac08d53-4b4b-46a2-a7d9-2ee301740e85",
+      "name": "Get Due Follow-Ups",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body=$json.body??$json; const list=Array.isArray(body)?body:(body.follow_ups||[]); return list.map(f=>({json:{follow_up:f}}));"
+      },
+      "id": "70227f48-143c-4582-8561-9b65ca4eb0ca",
+      "name": "Normalize Follow-Ups",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.API_BASE_URL}}/api/v1/leads/{{$json.follow_up.lead_id}}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.FASTAPI_INTERNAL_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "34da6ada-a39a-44c9-b0bd-8ca3eee40ee9",
+      "name": "Check Lead Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const f=$(\"Normalize Follow-Ups\").item.json.follow_up; const l=$json.body??$json; const ls=String(l.status||'').toUpperCase(), fs=String(f.status||'').toUpperCase(); const blockedLead=['CONVERTED','LOST'].includes(ls); const blockedFU=['CANCELLED','COMPLETED'].includes(fs); const agent=f.assigned_agent_id||l.assigned_agent_id||l.assigned_agent; return [{json:{follow_up:f,lead:l,eligible:!blockedLead&&!blockedFU&&!!agent,reason:blockedLead?'LEAD_NOT_ACTIVE':blockedFU?'FOLLOWUP_NOT_PENDING':!agent?'NO_ASSIGNED_AGENT':'ELIGIBLE'}}];"
+      },
+      "id": "578034bf-a914-4926-858f-f207c6407c97",
+      "name": "Evaluate Follow-Up Eligibility",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.eligible}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "dc03d0c5-264a-448b-92f3-5b1e25be6e32",
+      "name": "Eligibility Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const f=$json.follow_up,l=$json.lead; const name=l.name||l.customer_name||'Customer'; const channel=f.channel||'INTERNAL'; const message=f.message||`Follow-up due for ${name}. Lead: ${f.lead_id||l.id}.`; return [{json:{follow_up:f,lead:l,channel,message,reminder:{follow_up_id:f.id,lead_id:f.lead_id||l.id,assigned_agent_id:f.assigned_agent_id||l.assigned_agent_id||null,channel,message}}}];"
+      },
+      "id": "5b324172-1a3b-4be5-a1d5-2198b4f4626e",
+      "name": "Build Reminder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.FOLLOWUP_NOTIFY_WEBHOOK_URL}}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.N8N_INTERNAL_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{JSON.stringify($json.reminder)}}"
+      },
+      "id": "a6fdbde4-116b-4159-9746-57e018103d93",
+      "name": "Send Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -120
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$env.API_BASE_URL}}/api/v1/follow-ups/{{$json.follow_up.id}}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.FASTAPI_INTERNAL_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{JSON.stringify({status:\"REMINDER_SENT\",last_reminded_at:new Date().toISOString()})}}"
+      },
+      "id": "d1502824-5dba-4c12-b22d-126e5e4f833b",
+      "name": "Update Follow-Up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RECORD_ACTIVITY_URL}}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.FASTAPI_INTERNAL_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{JSON.stringify({lead_id:$json.follow_up.lead_id,activity_type:\"FOLLOWUP_REMINDER_SENT\",description:\"Scheduled follow-up reminder sent\",metadata:{follow_up_id:$json.follow_up.id,channel:$json.channel}})}}"
+      },
+      "id": "758a31ac-1d88-4518-b307-dc240168d728",
+      "name": "Create Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        -120
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RECORD_ACTIVITY_URL}}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.FASTAPI_INTERNAL_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{JSON.stringify({lead_id:$json.follow_up.lead_id,activity_type:\"FOLLOWUP_SKIPPED\",description:\"Due follow-up skipped\",metadata:{follow_up_id:$json.follow_up.id,reason:$json.reason}})}}"
+      },
+      "id": "8828337d-231e-4fec-8581-d50213f17b2a",
+      "name": "Record Skipped Follow-Up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        160
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{json:{workflow:'PRH-FOLLOWUP-REMINDER',status:'COMPLETED',processed_at:new Date().toISOString()}}];"
+      },
+      "id": "87b0c15d-264b-4ee9-aa58-a3cac6b8facf",
+      "name": "Execution Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Due Follow-Ups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Due Follow-Ups": {
+      "main": [
+        [
+          {
+            "node": "Normalize Follow-Ups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Follow-Ups": {
+      "main": [
+        [
+          {
+            "node": "Check Lead Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Lead Status": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Follow-Up Eligibility",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Follow-Up Eligibility": {
+      "main": [
+        [
+          {
+            "node": "Eligibility Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eligibility Check": {
+      "main": [
+        [
+          {
+            "node": "Build Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Skipped Follow-Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reminder": {
+      "main": [
+        [
+          {
+            "node": "Send Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reminder": {
+      "main": [
+        [
+          {
+            "node": "Update Follow-Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Follow-Up": {
+      "main": [
+        [
+          {
+            "node": "Create Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Activity": {
+      "main": [
+        [
+          {
+            "node": "Execution Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Skipped Follow-Up": {
+      "main": [
+        [
+          {
+            "node": "Execution Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b7fe034a-1494-4fa0-8138-ec4a960e3aa6",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {}
+}
